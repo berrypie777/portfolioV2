@@ -1,0 +1,34 @@
+services:
+  db:
+    restart: always
+    image: mysql:8.0
+    platform: linux/amd64
+    command: --default-authentication-plugin=mysql_native_password 
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./my.cnf:/etc/mysql/conf.d/my.cnf
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      TZ: "Asia/Tokyo"
+    ports:
+      - '3306:3306'
+  web:
+    restart: always
+    build: .
+    volumes:
+      - .:/docker-rails
+      - gem-data:/usr/local/bundle
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    stdin_open: true
+    tty: true
+    environment:
+      MYSQL_PASSWORD: password
+      TZ: "Asia/Tokyo"
+volumes:
+  db-data:
+    driver: local
+  gem-data:
+    driver: local
