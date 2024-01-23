@@ -1,0 +1,76 @@
+version: 2.1
+
+orbs:
+  ruby: circleci/ruby@2.1.0
+  heroku: circleci/heroku@2.0.0
+  node: circleci/node@5.2.0
+
+jobs:
+  build:
+    working_directory: ~/work
+    docker:
+      - image: cimg/ruby:3.2.2-node
+    steps:
+      - checkout
+      - ruby/install-deps
+      - node/install-packages:
+          pkg-manager: yarn
+
+  rubocop:
+    parallelism: 3
+    working_directory: ~/work
+    docker:
+      - image: cimg/ruby:3.2.2-node
+      - image: cimg/mysql:8.0
+        environment:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: app_test
+          MYSQL_ROOT_USER: root
+    environment:
+      BUNDLE_JOBS: "3"
+      BUNDLE_RETRY: "3"
+      APP_DATABASE_HOST: 127.0.0.1
+      RAILS_ENV: test
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.18
+      - ruby/install-deps
+      - run:
+          name: Container setup
+          command: |
+            docker-compose up -d
+      - run:
+          name: DB setup
+          command: |
+            bundle exec rake db:create db:migrate
+      - run:
+          name: Run rubocop
+          command: |
+            bundle exec rubocop 
+
+  deploy:
+    executor: heroku/default
+    steps:
+      - checkout
+      - heroku/install
+      - run:
+          name: Deploy
+          command: |
+            git push https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP_NAME.git HEAD:main
+      - run:
+          name: Run post-deploy tasks
+          command: |
+            heroku run bin/rails db:migrate -a $HEROKU_APP_NAME
+      
+workflows:
+  version: 2.1
+  build_test_and_deploy:
+    jobs:
+      - build
+      - rubocop:
+          requires:
+            - build
+      - deploy:
+          requires:
+            - rubocop
