@@ -47,7 +47,7 @@ jobs:
       - run:
           name: Run rubocop
           command: |
-            bundle exec rubocop 
+            bundle exec rubocop --require rubocop-airbnb
 
   deploy:
     executor: heroku/default
